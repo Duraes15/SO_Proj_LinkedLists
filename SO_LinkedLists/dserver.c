@@ -19,7 +19,7 @@ int main(int argc, char* argv[]){
     //char cache_size = argv[2];
     while (1)
     {
-        printf("ID = %d\n", ID);
+        //printf("ID = %d\n", ID);
         int fd = open(main_fifo, O_RDONLY);
         if (fd == -1)
         {
@@ -64,8 +64,19 @@ int main(int argc, char* argv[]){
                 serialization(pid, &indices, &ID, pipefd);
                 _exit(codeSaida); // escolhe a opçao e manda executar
             }
-            else
+            else{
+                int status;
+                waitpid(pid,&status,0);
+                if (WIFEXITED(status) && WEXITSTATUS(status) == 3){
+                    printf("Shutdown requested. Exiting server loop.\n");
+                    int fd2 = open(fifoName[0], O_WRONLY, 0666);
+                    write(fd2, "Server Shutdown!", 17);
+                    close(fd2);
+                    break;
+                }
                 serialization(pid, &indices, &ID, pipefd);
+            }
+                
         }
         close(fd);
     }
@@ -123,7 +134,7 @@ int choose_option(char *fifo, char** s, Livro *indices, int *ID) {
             case 'f':
                 exitCode = 3;
                 unlink(fifo);
-                return (exitCode);
+                //return (exitCode);
                 break;
             default:
                 exitCode = 0;

@@ -117,6 +117,7 @@ char **split(const char *s, char sep) {
     res[idx] = NULL;
     return res;
 }
+
 /*
 int persistencia(Livro head) {
     char temp[256];
