@@ -1,5 +1,100 @@
 #include "dserver.h"
 
+/* Cria um novo nó (livro) duplicando strings */
+Livro createBook(int id, const char *title, const char *author, int year, const char *path) {
+    Livro n = malloc(sizeof(struct LivroNode));
+    if (!n) 
+        return NULL;
+    n->id = id;
+    n->year = year;
+    n->title = strdup(title);
+    n->author = strdup(author);
+    n->path = strdup(path);
+    n->next = NULL;
+    return n;
+}
+
+/* Insere no fim da lista */
+Livro insertBook(Livro head, Livro novo) {
+    if (!novo) 
+        return head;
+    if (!head)
+        return novo;
+
+    Livro cur = head;
+    while (cur->next)
+        cur = cur->next;
+    cur->next = novo;
+    return head;
+}
+
+Livro findBook(Livro head, int id) {
+    for (Livro cur = head; cur; cur = cur->next) {
+        if (cur->id == id)
+            return cur;
+    }
+    return NULL;
+}
+
+Livro removeBook(Livro head, int id, int *removido) {
+    Livro cur = head;
+    Livro prev = NULL;
+    while (cur) {
+        if (cur->id == id) {
+            if (prev)
+                prev->next = cur->next;
+            else
+                head = cur->next;
+            /* libera o nó */
+            free(cur->title);
+            free(cur->author);
+            free(cur->path);
+            free(cur);
+            *removido = 1;
+            return head;
+        }
+        prev = cur;
+        cur = cur->next;
+    }
+    return head;
+}
+
+void printList(Livro head, int fd) {
+    char buf[512];
+    for (Livro cur = head; cur; cur = cur->next) {
+        /* sprintf escreve no buf e devolve o número de bytes (excluindo o '\0') */
+        int len = sprintf(buf, "ID=%d | %s — %s (%d) @ %s\n", cur->id, cur->title, cur->author, cur->year, cur->path);
+        if (len < 0) {
+            perror("sprintf");
+            continue;
+        }
+        ssize_t w = write(fd, buf, (size_t)len);
+        if (w < 0) {
+            perror("write");
+        }
+    }
+}
+
+int listLen(Livro head)
+{
+    int i = 0;
+    for (; head ; head = head->next)
+        i++;
+    return i;
+}
+
+void freeList(Livro head) {
+    Livro cur = head;
+    while (cur) {
+        Livro next = cur->next;
+        free(cur->title);
+        free(cur->author);
+        free(cur->path);
+        free(cur);
+        cur = next;
+    }
+}
+
 char **split(const char *s, char sep) {
     size_t count = 1;
     for (const char *p = s; *p; p++)
@@ -22,7 +117,7 @@ char **split(const char *s, char sep) {
     res[idx] = NULL;
     return res;
 }
-
+/*
 int persistencia(Livro head) {
     char temp[256];
     snprintf(temp, sizeof temp, "%s.temp", META_FILENAME);
@@ -87,7 +182,7 @@ int persistencia(Livro head) {
     }
 
     return 0;
-}
+}*/
 
 char *getTextFromFile(int fd)
 {
@@ -304,10 +399,6 @@ char **parsing(char *fifoName)
         i++;
     }
     strs[k][j] = '\0';
-    // Para apagar
-    for (int i = 0; strs[i]; i++)
-        printf("Parsing do server: %s\n", strs[i]);
-    // apagar até aquimain
 
     close(fdFIFO);
     return (strs);
@@ -324,9 +415,8 @@ int indexaDoc(Livro *indices, char *title, char *authors, int year, char *path, 
         (*(ID))++;
         Livro novaLista = insertBook(*indices, novoLivro);
         *indices = novaLista;
-        printf("Inserted correctly\n");
     } else {
-        printf("Livro not inserted correctly in table\n");
+        perror("Creation of newBook Error");
     }
 
     int fd = open(fifo, O_WRONLY, 0666);
@@ -396,29 +486,3 @@ int listaIdDocs(char *keyword, Livro indices, char *fifo)
     freeList(listaComKeywords);
     return 1;
 }
-
-
-
-/*
-3. Assim já está correta a opção de remoção (-d)?
-int removeDoc(Livro *indices, int id, char *fifo)
-{
-    int removido = 0;
-    Livro newList = removeBook(*indices, id, &removido);
-    *indices = newList;
-    int fd = open(fifo, O_WRONLY, 0666);
-    char buffer[64];
-    if (removido) {
-        sprintf(buffer, "Livro com id %d removido com sucesso\n", id);
-        write(fd, buffer, strlen(buffer));
-        close(fd);
-        return 1;
-    } else {
-        sprintf(buffer, "Livro com id %d nao encontrado\n", id);
-        write(fd, buffer, strlen(buffer));
-        close(fd);
-        return 0;
-    }
-}
-
-*/

@@ -47,17 +47,16 @@ int main(int argc, char* argv[]){
             pid_t pid = fork();
             if (pid == 0) 
             { // Filho
-                printf("Filho criado\n");
                 close(fd);
                 char **strs = parsing(&(fifoName[0]));
                 int codeSaida = choose_option(&(fifoName[0]),strs,&indices, &ID);
                 
-                if (codeSaida == 3)
+                /*if (codeSaida == 3)
                 {
                     close(main_fifo);
                     unlink(main_fifo);
                     break;
-                }
+                }*/
 
                 for (int i = 0; strs[i]; i++)
                     free(strs[i]);
@@ -71,7 +70,7 @@ int main(int argc, char* argv[]){
         close(fd);
     }
     freeList(indices);
-    for (int i = 1; i <= ID; i++)
+    for (int i = 1; i <= counter; i++)
     {
         wait(NULL);
         char buffer[32];

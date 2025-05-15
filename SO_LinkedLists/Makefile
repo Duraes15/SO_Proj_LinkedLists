@@ -1,20 +1,17 @@
-CC      := gcc
-CFLAGS  := -Wall -g
+CC = gcc
+CFLAGS = -Wall -g
 
-# acrescenta LLFunctions.c a ambos os builds
-COMMON_SRC     := LLFunctions.c
-CLIENT_SRC     := dclient.c client.c $(COMMON_SRC)
-SERVER_SRC     := dserver.c server.c $(COMMON_SRC)
-
-CLIENT_BIN := dclient
-SERVER_BIN := dserver
+CLIENT_SRC = dclient.c client.c 
+SERVER_SRC = dserver.c server.c 
+CLIENT_BIN = dclient
+SERVER_BIN = dserver
 
 all: $(CLIENT_BIN) $(SERVER_BIN)
 
-$(CLIENT_BIN): $(CLIENT_SRC) dclient.h
+$(CLIENT_BIN): $(CLIENT_SRC)
 	$(CC) $(CFLAGS) -o $@ $(CLIENT_SRC)
 
-$(SERVER_BIN): $(SERVER_SRC) dserver.h
+$(SERVER_BIN): $(SERVER_SRC)
 	$(CC) $(CFLAGS) -o $@ $(SERVER_SRC)
 
 clean:
