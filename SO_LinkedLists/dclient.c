@@ -22,7 +22,6 @@ int main(int argc, char* argv[]){
         perror("ERRO");
     }
     write(fd_mainFIFO, "Pedido Server", 14);
-    printf("Pedido enviado ao server\n");
     close(fd_mainFIFO);
 
     fd_mainFIFO = open(MAIN_FIFO, O_RDONLY, 0666);
@@ -31,12 +30,10 @@ int main(int argc, char* argv[]){
         perror("ERRO");
     }
     
-
-    printf("Fuck build\n");
     char *str = build_message(argc, argv);
     
     char fifoName[32];
-    printf("Vou ler\n");
+
     int bytesRead = read(fd_mainFIFO, fifoName, sizeof(fifoName) - 1);
     if (bytesRead <= 0) 
     {
@@ -53,8 +50,6 @@ int main(int argc, char* argv[]){
         return main(argc,argv);
     }
 
-    printf("\n%s\n\n",fifoName);
-
     if (strcmp("Pedido Inválido", fifoName) == 0)
     {
         perror("Erro no Pedido");
@@ -64,7 +59,6 @@ int main(int argc, char* argv[]){
 
     int fdFIFO = open(fifoName, O_WRONLY, 0666);
     write(fdFIFO, str, strlen(str));
-    printf("Enviamos pedido para pipe\n");
     close(fdFIFO);
     free(str);
 
@@ -81,5 +75,7 @@ int main(int argc, char* argv[]){
     }
     serverResponse[respBytes] = '\0';
     printf("Server Response:\n%s\n", serverResponse);
+    
     close(fdFIFO);
+    unlink(fdFIFO);
 }

@@ -115,6 +115,7 @@ char **split(const char *s, char sep) {
         }
     }
     res[idx] = NULL;
+    free(s);
     return res;
 }
 
@@ -235,7 +236,7 @@ char *getTextFromFile(int fd)
     return str;
 }
 
-int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword)
+int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, char *docFolder)
 {
     Livro designado = NULL;
     for (Livro cur = indices; cur; cur = cur->next) {
@@ -245,7 +246,7 @@ int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword)
         }
     }
 
-    int fdFIFO = open(fifo, O_WRONLY | O_NONBLOCK, 0666);
+    int fdFIFO = open(fifo, O_WRONLY, 0666);
     if (fdFIFO < 0) {
         perror("open fifo");
         return -1;
@@ -257,7 +258,10 @@ int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword)
         return 0;
     }
 
-    int fdLivro = open(designado->path, O_RDONLY);
+    char newPath[64];
+    sprintf(newPath,docFolder);
+    sprintf(newPath,designado->path);
+    int fdLivro = open(newPath, O_RDONLY,0666);
     if (fdLivro < 0) 
     {
         perror("open livro");
@@ -427,7 +431,7 @@ int indexaDoc(Livro *indices, char *title, char *authors, int year, char *path, 
     }
 
     char entrega[64];
-    int bytes = snprintf(entrega, sizeof(entrega), "Livro indexado com id: %d\n", novoLivro->id);
+    int bytes = snprintf(entrega, sizeof(entrega), "Document %d indexed\n", novoLivro->id);
     write(fd, entrega, bytes);
     close(fd);
     return 1;
@@ -475,7 +479,7 @@ int listaIdDocs(char *keyword, Livro indices, char *fifo)
         }
     }
 
-    int fd = open(fifo, O_WRONLY | O_NONBLOCK, 0666);
+    int fd = open(fifo, O_WRONLY, 0666);
     if (fd < 0) {
         perror("open fifo");
         freeList(listaComKeywords);

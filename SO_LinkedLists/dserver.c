@@ -1,7 +1,21 @@
 #include "dserver.h"
 
 int main(int argc, char* argv[]){
+    if (argc < 3){
+        printf("Poucos Argumentos");
+        exit(EXIT_FAILURE);
+    }
+
+    char docFolder = argv[1];
+    int cache_size = atoi(argv[2]);
+
+    if (cache_size <= 0){
+        printf("Erro: cache deve ser positivo!\n");
+        exit(EXIT_FAILURE);
+    }
+    
     int ID = 1;
+
 
     if (mkfifo(MAIN_FIFO, 0666) < 0) {
         if (errno != EEXIST) {
@@ -12,8 +26,7 @@ int main(int argc, char* argv[]){
     char inBuff[512];
     int counter = 1;
     Livro indices = NULL;
-    //char docFolder = argv[1];
-    //char cache_size = argv[2];
+
     while (1)
     {
         printf("ID = %d\n", ID);
@@ -31,6 +44,7 @@ int main(int argc, char* argv[]){
             char fifoName[32];
             int bytes = sprintf(fifoName, "client_response%d", counter);
             mkfifo(fifoName, 0666);
+            printf("Fifo criado:%s\n",fifoName);
             counter++;
 
             fd = open(MAIN_FIFO,O_WRONLY, 0666);
@@ -49,7 +63,7 @@ int main(int argc, char* argv[]){
             { // Filho
                 close(fd);
                 char **strs = parsing(&(fifoName[0]));
-                int codeSaida = choose_option(&(fifoName[0]),strs,&indices, &ID);
+                int codeSaida = choose_option(&(fifoName[0]),strs,&indices, &ID,docFolder);
                 
                 /*if (codeSaida == 3)
                 {
@@ -76,7 +90,6 @@ int main(int argc, char* argv[]){
                     write(fd2, "Server Shutdown!", 17);
                     close(fd2);
                     printf("Shutdown requested. Exiting server loop.\n");
-                    unlink(fifoName);
                     break;
                 }
             } 
@@ -106,7 +119,7 @@ int main(int argc, char* argv[]){
 
 
 
-int choose_option(char *fifo, char** s, Livro *indices, int *ID) {
+int choose_option(char *fifo, char** s, Livro *indices, int *ID, char *docFolder) {
     //printf("Option:%s\n",s[0]);
     int exitCode;
     if(strlen(s[0]) == 2 && s[0][0] == '-'){
@@ -125,7 +138,7 @@ int choose_option(char *fifo, char** s, Livro *indices, int *ID) {
                 break;
             
             case 'l':
-                exitCode = numeroLinhas(fifo, indices, atoi(s[1]), s[2]);
+                exitCode = numeroLinhas(fifo, indices, atoi(s[1]), s[2], docFolder);
                 break;
             
             case 's':

@@ -19,11 +19,11 @@ typedef struct LivroNode {
     struct LivroNode *next;
 } *Livro;
 
-int choose_option(char *fifo, char** s, Livro *indices, int *ID);
+int choose_option(char *fifo, char** s, Livro *indices, int *ID, char *docFolder);
 char **split(const char *s, char sep);
 int persistencia(Livro head);
 char *getTextFromFile(int fd);
-int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword);
+int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, char *docFolder);
 int procuraID(char *fifo, int id, Livro indices);
 int nGivenSigns(char *str, char c);
 char **parsing(char *fifoName);
