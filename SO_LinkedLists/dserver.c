@@ -2,11 +2,8 @@
 
 int main(int argc, char* argv[]){
     int ID = 1;
-    int fd;
 
-    char *main_fifo = "server_pipe";
-
-    if (mkfifo(main_fifo, 0666) < 0) {
+    if (mkfifo(MAIN_FIFO, 0666) < 0) {
         if (errno != EEXIST) {
             perror("mkfifo");
             exit(1);
@@ -19,8 +16,8 @@ int main(int argc, char* argv[]){
     //char cache_size = argv[2];
     while (1)
     {
-        //printf("ID = %d\n", ID);
-        int fd = open(main_fifo, O_RDONLY);
+        printf("ID = %d\n", ID);
+        int fd = open(MAIN_FIFO, O_RDONLY, 0666);
         if (fd == -1)
         {
             perror("open");
@@ -28,7 +25,7 @@ int main(int argc, char* argv[]){
         }
 
         ssize_t n = read(fd, inBuff, sizeof(inBuff));
-        if (n > 0) 
+        if (n > 0 && strncmp(inBuff,"Pedido Server",13) == 0) 
         {
             printf("Recebemos pedido de criação de fifo\n");
             char fifoName[32];
@@ -36,7 +33,10 @@ int main(int argc, char* argv[]){
             mkfifo(fifoName, 0666);
             counter++;
 
-            fd = open(main_fifo,O_WRONLY);
+            fd = open(MAIN_FIFO,O_WRONLY, 0666);
+            if (fd == -1){
+                perror("Error opening main_fifo!");
+            }
             write(fd,fifoName,bytes);
 
             int pipefd[2];
@@ -61,33 +61,34 @@ int main(int argc, char* argv[]){
                 for (int i = 0; strs[i]; i++)
                     free(strs[i]);
                 free(strs);
+                close(pipefd[0]);
                 serialization(pid, &indices, &ID, pipefd);
                 _exit(codeSaida); // escolhe a opçao e manda executar
             }
             else{
                 int status;
+                close(pipefd[1]);
+                serialization(pid, &indices, &ID, pipefd);
                 waitpid(pid,&status,0);
-                if (WIFEXITED(status) && WEXITSTATUS(status) == 3){
-                    printf("Shutdown requested. Exiting server loop.\n");
-                    int fd2 = open(fifoName[0], O_WRONLY, 0666);
+                if (WIFEXITED(status) && WEXITSTATUS(status) == 3)
+                {
+                    int fd2 = open(fifoName, O_WRONLY, 0666);
                     write(fd2, "Server Shutdown!", 17);
                     close(fd2);
+                    printf("Shutdown requested. Exiting server loop.\n");
+                    unlink(fifoName);
                     break;
                 }
-                serialization(pid, &indices, &ID, pipefd);
-            }
-                
+            } 
         }
         close(fd);
     }
     freeList(indices);
-    for (int i = 1; i <= counter; i++)
+    /*for (int i = 1; i <= counter; i++)
     {
         wait(NULL);
-        char buffer[32];
-        sprintf(buffer, "client_response%d\n", i);
-        unlink(buffer);
-    }
+        // os fifos já foram fechados no choose_options
+    }*/
 
     /*if (persistencia(indices) < 0)
     {
@@ -98,15 +99,15 @@ int main(int argc, char* argv[]){
         printf("Persistência gravada em %s\n", META_FILENAME);
     }*/
 
-    close(main_fifo);
-    unlink(main_fifo);
+    close(MAIN_FIFO);
+    unlink(MAIN_FIFO);
     return 0;
 }
 
 
 
 int choose_option(char *fifo, char** s, Livro *indices, int *ID) {
-    printf("Option:%s\n",s[0]);
+    //printf("Option:%s\n",s[0]);
     int exitCode;
     if(strlen(s[0]) == 2 && s[0][0] == '-'){
         switch (s[0][1])
@@ -133,8 +134,7 @@ int choose_option(char *fifo, char** s, Livro *indices, int *ID) {
             
             case 'f':
                 exitCode = 3;
-                unlink(fifo);
-                //return (exitCode);
+                return (exitCode);
                 break;
             default:
                 exitCode = 0;
@@ -156,8 +156,7 @@ void serialization(int pid, Livro *indices, int *idAtual, int pipefd[2])
     // o numero de nodos inclui ate o nodo [nodeInfo] -> NULL
     if (pid == 0)
     {
-        // nao necessito de ler do pipe
-        close(pipefd[0]);
+
 
         //1º escrever numero de nodos (Done)
         int lenLista = listLen(*indices);
@@ -193,8 +192,6 @@ void serialization(int pid, Livro *indices, int *idAtual, int pipefd[2])
     }
     else
     {
-        // nao precisa de escrever para o pipe
-        close(pipefd[1]);
 
         //1º ler o numero de nodos
         int nNodes;

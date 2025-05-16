@@ -8,6 +8,7 @@
 #include <errno.h>
 
 #define META_FILENAME "Ficheirotemp"
+#define MAIN_FIFO "server_pipe"
 
 typedef struct LivroNode {
     char *title;
