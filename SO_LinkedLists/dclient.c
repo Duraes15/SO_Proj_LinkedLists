@@ -21,43 +21,19 @@ int main(int argc, char* argv[]){
     {
         perror("ERRO");
     }
-    write(fd_mainFIFO, "Pedido Server", 14);
-    close(fd_mainFIFO);
-
-    fd_mainFIFO = open(MAIN_FIFO, O_RDONLY, 0666);
-    if (fd_mainFIFO == -1)
+    pid_t pid = getpid();
+    char fifoName[32];
+    sprintf(fifoName, "client_response%d", pid);
+    mkfifo(fifoName, 0666);
+    int fdFIFO = open(fifoName, O_WRONLY, 0666);
+    if (fdFIFO == -1)
     {
         perror("ERRO");
     }
+    write(fd_mainFIFO, &pid, sizeof(pid_t));
+    close(fd_mainFIFO);
     
     char *str = build_message(argc, argv);
-    
-    char fifoName[32];
-
-    int bytesRead = read(fd_mainFIFO, fifoName, sizeof(fifoName) - 1);
-    if (bytesRead <= 0) 
-    {
-        perror("Read Error");
-        close(fd_mainFIFO);
-        free(str);
-        return 0;
-    }
-    fifoName[bytesRead] = '\0';
-
-    
-    if (strncmp(fifoName, "client_response",15) == 1){
-        perror("Li pedido de outro client!");
-        return main(argc,argv);
-    }
-
-    if (strcmp("Pedido Inválido", fifoName) == 0)
-    {
-        perror("Erro no Pedido");
-    }
-    
-    close(fd_mainFIFO);
-
-    int fdFIFO = open(fifoName, O_WRONLY, 0666);
     write(fdFIFO, str, strlen(str));
     close(fdFIFO);
     free(str);
@@ -71,11 +47,13 @@ int main(int argc, char* argv[]){
     if (respBytes < 0){
         perror("Erro na leitura da resposta");
         close(fdFIFO);
-        return 1;
+        unlink(fdFIFO);
+        return 0;
     }
     serverResponse[respBytes] = '\0';
     printf("Server Response:\n%s\n", serverResponse);
     
     close(fdFIFO);
     unlink(fdFIFO);
+    return 1;
 }

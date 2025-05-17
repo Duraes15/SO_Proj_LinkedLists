@@ -1,21 +1,8 @@
 #include "dserver.h"
 
 int main(int argc, char* argv[]){
-    if (argc < 3){
-        printf("Poucos Argumentos");
-        exit(EXIT_FAILURE);
-    }
-
     char docFolder = argv[1];
-    int cache_size = atoi(argv[2]);
-
-    if (cache_size <= 0){
-        printf("Erro: cache deve ser positivo!\n");
-        exit(EXIT_FAILURE);
-    }
-    
     int ID = 1;
-
 
     if (mkfifo(MAIN_FIFO, 0666) < 0) {
         if (errno != EEXIST) {
@@ -30,29 +17,22 @@ int main(int argc, char* argv[]){
     while (1)
     {
         printf("ID = %d\n", ID);
-        int fd = open(MAIN_FIFO, O_RDONLY, 0666);
-        if (fd == -1)
+        int fdMainFIFO = open(MAIN_FIFO, O_RDONLY, 0666);
+        if (fdMainFIFO == -1)
         {
             perror("open");
             continue;
         }
-
-        ssize_t n = read(fd, inBuff, sizeof(inBuff));
-        if (n > 0 && strncmp(inBuff,"Pedido Server",13) == 0) 
+        pid_t pidClient;
+        ssize_t n = read(fdMainFIFO, &pidClient, sizeof(pid_t));
+        close(fdMainFIFO);
+        if (n > 0)
         {
-            printf("Recebemos pedido de criação de fifo\n");
             char fifoName[32];
-            int bytes = sprintf(fifoName, "client_response%d", counter);
-            mkfifo(fifoName, 0666);
-            printf("Fifo criado:%s\n",fifoName);
+            printf("PID do client = %d\n", pidClient);
+            int bytes = sprintf(fifoName, "client_response%d", pidClient);
             counter++;
-
-            fd = open(MAIN_FIFO,O_WRONLY, 0666);
-            if (fd == -1){
-                perror("Error opening main_fifo!");
-            }
-            write(fd,fifoName,bytes);
-
+            printf("FIFO Name = %s\n", fifoName);
             int pipefd[2];
             if (pipe(pipefd) == -1) {
                 perror("pipe");
@@ -61,7 +41,6 @@ int main(int argc, char* argv[]){
             pid_t pid = fork();
             if (pid == 0) 
             { // Filho
-                close(fd);
                 char **strs = parsing(&(fifoName[0]));
                 int codeSaida = choose_option(&(fifoName[0]),strs,&indices, &ID,docFolder);
                 
@@ -94,7 +73,6 @@ int main(int argc, char* argv[]){
                 }
             } 
         }
-        close(fd);
     }
     freeList(indices);
     /*for (int i = 1; i <= counter; i++)
