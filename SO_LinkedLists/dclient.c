@@ -14,32 +14,37 @@ int main(int argc, char* argv[]){
         printf("Persistência: ./dclient -f\n");
         return 1;
     }
+
+    char fifoName[32];
+    pid_t pid = getpid(); // pid para struct
+    req pedidoParaServer;
+    sprintf(fifoName, "client_response%d", pid);
+    pedidoParaServer.pid = pid;
+    char *tmp = build_message(argc, argv);
+    int i;
+    for (i = 0; tmp[i] != '\0'; i++)
+    {
+        pedidoParaServer.mensagem[i] = tmp[i];
+    }
+    pedidoParaServer.mensagem[i] = '\0';
+    pedidoParaServer.len = i;
+    free(tmp);
+    mkfifo(fifoName, 0666);
     
     int fd_mainFIFO = open(MAIN_FIFO, O_WRONLY, 0666);
-
     if (fd_mainFIFO == -1)
     {
         perror("ERRO");
     }
-    pid_t pid = getpid();
-    char fifoName[32];
-    sprintf(fifoName, "client_response%d", pid);
-    mkfifo(fifoName, 0666);
-    int fdFIFO = open(fifoName, O_WRONLY, 0666);
-    if (fdFIFO == -1)
-    {
-        perror("ERRO");
-    }
-    write(fd_mainFIFO, &pid, sizeof(pid_t));
-    close(fd_mainFIFO);
     
-    char *str = build_message(argc, argv);
-    write(fdFIFO, str, strlen(str));
-    close(fdFIFO);
-    free(str);
+    write(fd_mainFIFO, &(pedidoParaServer.pid), sizeof(int));
+    write(fd_mainFIFO, &(pedidoParaServer.len), sizeof(int));
+    write(fd_mainFIFO, &(pedidoParaServer.mensagem[0]), sizeof(char) * strlen(pedidoParaServer.mensagem));
+    close(fd_mainFIFO);
+    // ate aqui a mensagem ja foi enviada atraves do mainFIFO
 
     char serverResponse[512];
-    fdFIFO = open(fifoName, O_RDONLY, 0666);
+    int fdFIFO = open(fifoName, O_RDONLY, 0666);
     if (fdFIFO < 0){
         perror("Erro ao abrir Fifo de resposta");
     }
@@ -54,6 +59,6 @@ int main(int argc, char* argv[]){
     printf("Server Response:\n%s\n", serverResponse);
     
     close(fdFIFO);
-    unlink(fdFIFO);
+    unlink(fifoName);
     return 1;
 }

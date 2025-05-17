@@ -1,5 +1,53 @@
 #include "dserver.h"
 
+char *ints_to_string(const int *arr, size_t count) 
+{
+    if (count == 0) 
+    {
+        char *empty = malloc(1);
+        if (empty)
+        {
+             empty[0] = '\0';
+        }
+        return empty;
+    }
+    size_t max_digits = 11;
+    size_t bufsize = count * max_digits
+                   + (count - 1)  
+                   + 1;           
+    char *buf = malloc(bufsize);
+    if (!buf)
+    { 
+        return NULL;
+    }
+    char *p = buf;
+    size_t remaining = bufsize;
+    for (size_t i = 0; i < count; i++) 
+    {
+
+        int written = snprintf(p, remaining, "%d", arr[i]);
+        if (written < 0 || (size_t)written >= remaining) 
+        {
+            free(buf);
+            return NULL;
+        }
+        p += written;
+        remaining -= written;
+        
+        if (i + 1 < count) 
+        {
+            if (remaining < 2)
+            { 
+                free(buf); return NULL; 
+            }
+            *p++ = ',';
+            remaining--;
+        }
+    }
+    *p = '\0';
+    return buf;
+}
+
 /* Cria um novo nó (livro) duplicando strings */
 Livro createBook(int id, const char *title, const char *author, int year, const char *path) {
     Livro n = malloc(sizeof(struct LivroNode));
@@ -186,55 +234,32 @@ int persistencia(Livro head) {
     return 0;
 }*/
 
-char *getTextFromFile(int fd)
-{
+char *getTextFromFile(int fd) {
     char buffer[512];
-    size_t total = 0;
-    size_t capacity = sizeof buffer;
+    size_t total = 0, capacity = 512;
     char *str = malloc(capacity + 1);
-
-    if (!str)
-        return NULL;
+    if (!str) return NULL;
 
     ssize_t n;
-    while ((n = read(fd, buffer, sizeof buffer)) > 0)
-    {
-        if ((size_t)n < sizeof buffer)
-            buffer[n] = '\0';
-        else
-            buffer[sizeof buffer - 1] = '\0';
-
-        // Verificação de espaço
-        if (total + (size_t)n + 1 > capacity)
-        {
-            // ajuste no espaço em 2x
+    while ((n = read(fd, buffer, sizeof buffer)) > 0) {
+        if (total + (size_t)n + 1 > capacity) {
             size_t newcap = capacity * 2;
             while (newcap < total + (size_t)n + 1)
                 newcap *= 2;
             char *tmp = realloc(str, newcap + 1);
-            if (!tmp)
-            {
-                free(str);
-                return NULL;
-            }
+            if (!tmp) { free(str); return NULL; }
             str = tmp;
             capacity = newcap;
         }
-
-        // Copiar os bytes lidos
-        memcpy(str + total, buffer, n);
+        memcpy(str + total, buffer, (size_t)n);
         total += (size_t)n;
     }
+    if (n < 0) { free(str); return NULL; }
 
-    if (n < 0)
-    {
-        // erro no read
-        free(str);
-        return NULL;
-    }
     str[total] = '\0';
     return str;
 }
+
 
 int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, char *docFolder)
 {
@@ -253,26 +278,24 @@ int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, c
     }
 
     if (!designado) {
-        write(fdFIFO, "ID inválido\n", 13);
+        write(fdFIFO, "ID inválido\n", 14);
         close(fdFIFO);
         return 0;
     }
 
-    char newPath[64];
-    sprintf(newPath,docFolder);
-    sprintf(newPath,designado->path);
-    int fdLivro = open(newPath, O_RDONLY,0666);
-    if (fdLivro < 0) 
-    {
-        perror("open livro");
+    char newPath[512];
+    snprintf(newPath, sizeof(newPath), "%s/%s", docFolder, designado->path);
+    int fdLivro = open(newPath, O_RDONLY, 0666);
+
+    if (fdLivro < 0) {
+        perror("Open livro");
         close(fdFIFO);
         return -1;
     }
 
     char *texto = getTextFromFile(fdLivro);
     close(fdLivro);
-    if (!texto) 
-    {
+    if (!texto) {
         const char *msg = "Numero de linhas com essa keyword: 0\n";
         write(fdFIFO, msg, strlen(msg));
         close(fdFIFO);
@@ -281,24 +304,29 @@ int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, c
 
     int nLinhas = 0;
     char **separada = split(texto, '\n');
-    for (int i = 0; separada[i]; i++)
+    if (separada) 
     {
-        char *linhaComKeyword = strstr(separada[i], keyword);
-        if (linhaComKeyword)
-            nLinhas++;
-        free(separada[i]);
+        for (int i = 0; separada[i]; i++) 
+        {
+            if (strstr(separada[i], keyword)) 
+            {
+                nLinhas++;
+            }
+            free(separada[i]);
+        }
+        free(separada);
     }
-
-    free(separada);
-    free(texto);
 
     char strRetorno[64];
-    int len = snprintf(strRetorno, sizeof(strRetorno), "Numero de linhas com essa keyword: %d\n", nLinhas);
+    int len = sprintf(strRetorno, "Numero de linhas com essa keyword: %d\n", nLinhas);
+
     if (len < 0) {
         close(fdFIFO);
+        perror("Erro");
         return -1;
     }
-    write(fdFIFO, strRetorno, (size_t)len);
+
+    write(fdFIFO, strRetorno, sizeof(char) * len);
     close(fdFIFO);
     return 1;
 }
@@ -329,7 +357,6 @@ int procuraID(char *fifo, int id, Livro indices)
     }
     char str[512];
     int bytes_lidos = sprintf(str, "Title: %s | Author: %s | Year: %d | Path: %s\n", procurado->title, procurado->author, procurado->year, procurado->path);
-    printf("str = %s\n",str);
     write(fdFIFO, str, bytes_lidos);
     close(fdFIFO);
     return 1;
@@ -346,37 +373,15 @@ int nGivenSigns(char *str, char c)
     return counter;
 }
 
-char **parsing(char *fifoName)
+char **parsing(char *mensagem)
 {
-    //printf("Entrou no parsing com fifoName = %s\n", fifoName);
-    int fdFIFO = open(fifoName, O_RDONLY, 0666);
-    //printf("WTF\n");
-    if (fdFIFO < 0)
-    {
-        perror("FIFO not opened");
-        return NULL;
-    }
-
-    char str[512];
-    int bytesRead = read(fdFIFO, &str, 511);
-    if (bytesRead < 0)
-    {
-        perror("ERRO");
-        close(fdFIFO);
-        return NULL;
-    }
-    str[bytesRead] = '\0';
-    //printf("str = %s\n", str);
-
-    int nArgs = nGivenSigns(str, '|');
+    int nArgs = nGivenSigns(mensagem, '|');
     char **strs = malloc(sizeof(char *) * (nArgs + 2));
     if (!strs)
     {
         perror("ERRO");
-        close(fdFIFO);
         return NULL;
     }
-    //printf("Tamanho dos strs = %ld\n", sizeof(strs));
     for (int i = 0; i < (nArgs + 1); i++)
     {
         strs[i] = malloc(sizeof(char) * 512);
@@ -387,10 +392,9 @@ char **parsing(char *fifoName)
     int j = 0; // indice das strings do char** args[k][j]
     int k = 0; // indica a string que estamos a escrever (args[k])
 
-    while (str[i] != '\0')
+    while (mensagem[i] != '\0')
     {
-        //printf("Caractere atual = %c\n", str[i]);
-        if (str[i] == '|')
+        if (mensagem[i] == '|')
         {
             strs[k][j] = '\0';
             j = 0;
@@ -398,14 +402,12 @@ char **parsing(char *fifoName)
         }
         else
         {
-            strs[k][j] = str[i];
+            strs[k][j] = mensagem[i];
             j++;
         }
         i++;
     }
     strs[k][j] = '\0';
-
-    close(fdFIFO);
     return (strs);
 }
 
@@ -457,12 +459,15 @@ int removeDoc(Livro *indices, int id, char *fifo)
     }
 }
 
-int listaIdDocs(char *keyword, Livro indices, char *fifo)
+int listaIdDocs(char *keyword, Livro indices, char *fifo, char *docFolder)
 {
-    Livro listaComKeywords = NULL;
+    int *listaIDs = NULL;
+    int len = 0;
 
     for (Livro cur = indices; cur; cur = cur->next) {
-        int fdLivro = open(cur->path, O_RDONLY);
+        char newPath[64];
+        sprintf(newPath, "%s%s", docFolder, cur->path);
+        int fdLivro = open(newPath, O_RDONLY,0666);
         if (fdLivro < 0) {
             perror("open livro");
             continue;
@@ -472,8 +477,17 @@ int listaIdDocs(char *keyword, Livro indices, char *fifo)
         close(fdLivro);
         if (texto) {
             if (strstr(texto, keyword)) {
-                Livro temp = createBook(cur->id, cur->title, cur->author, cur->year, cur->path);
-                listaComKeywords = insertBook(listaComKeywords, temp);
+                if (len == 0)
+                {
+                    listaIDs = malloc(sizeof(int) * (++len));
+                    listaIDs[0] = cur->id;
+                }
+                else
+                {
+                    int *tmp = realloc(listaIDs, sizeof(int) * (++len));
+                    listaIDs = tmp;
+                    listaIDs[len - 1] = cur->id;
+                }
             }
             free(texto);
         }
@@ -482,12 +496,22 @@ int listaIdDocs(char *keyword, Livro indices, char *fifo)
     int fd = open(fifo, O_WRONLY, 0666);
     if (fd < 0) {
         perror("open fifo");
-        freeList(listaComKeywords);
+        free(listaIDs);
         return -1;
     }
 
-    printList(listaComKeywords, fd);
+    if (len == 0)
+    {
+        write(fd, "Nenhum livro com essa keyword.\n", 32);
+        close(fd);
+        return 1;
+    }
+    
+    int size = len;
+    char *s = ints_to_string(listaIDs, len);
+    write(fd, s, strlen(s));
+    free(s);
+    free(listaIDs);
     close(fd);
-    freeList(listaComKeywords);
     return 1;
 }

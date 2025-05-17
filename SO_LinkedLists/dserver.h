@@ -19,6 +19,12 @@ typedef struct LivroNode {
     struct LivroNode *next;
 } *Livro;
 
+typedef struct Pedido {
+    pid_t pid;
+    int len;
+    char mensagem[512];
+}   req;
+
 int choose_option(char *fifo, char** s, Livro *indices, int *ID, char *docFolder);
 char **split(const char *s, char sep);
 int persistencia(Livro head);
@@ -26,10 +32,10 @@ char *getTextFromFile(int fd);
 int numeroLinhas(const char *fifo, Livro indices, int id, const char *keyword, char *docFolder);
 int procuraID(char *fifo, int id, Livro indices);
 int nGivenSigns(char *str, char c);
-char **parsing(char *fifoName);
+char **parsing(char *mensagem);
 int indexaDoc(Livro *indices, char *title, char *authors, int year, char *path, char *fifo, int *ID);
 int removeDoc(Livro *indices, int id, char *fifo);
-int listaIdDocs(char *keyword, Livro indices, char *fifo);
+int listaIdDocs(char *keyword, Livro indices, char *fifo, char *docFolder);
 Livro createBook(int id, const char *title, const char *author, int year, const char *path);
 Livro insertBook(Livro head, Livro novo);
 Livro findBook(Livro head, int id);

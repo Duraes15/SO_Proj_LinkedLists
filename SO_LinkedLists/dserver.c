@@ -1,9 +1,8 @@
 #include "dserver.h"
 
 int main(int argc, char* argv[]){
-    char docFolder = argv[1];
+    char *docFolder = argv[1];
     int ID = 1;
-
     if (mkfifo(MAIN_FIFO, 0666) < 0) {
         if (errno != EEXIST) {
             perror("mkfifo");
@@ -23,16 +22,17 @@ int main(int argc, char* argv[]){
             perror("open");
             continue;
         }
-        pid_t pidClient;
-        ssize_t n = read(fdMainFIFO, &pidClient, sizeof(pid_t));
+        req pedidoDoCliente;
+        ssize_t n = read(fdMainFIFO, &(pedidoDoCliente.pid), sizeof(int));
+        n += read(fdMainFIFO, &(pedidoDoCliente.len), sizeof(int));
+        n += read(fdMainFIFO, &(pedidoDoCliente.mensagem), sizeof(char) * pedidoDoCliente.len);
+        pedidoDoCliente.mensagem[pedidoDoCliente.len] = '\0';
         close(fdMainFIFO);
         if (n > 0)
         {
             char fifoName[32];
-            printf("PID do client = %d\n", pidClient);
-            int bytes = sprintf(fifoName, "client_response%d", pidClient);
+            int bytes = sprintf(fifoName, "client_response%d", pedidoDoCliente.pid);
             counter++;
-            printf("FIFO Name = %s\n", fifoName);
             int pipefd[2];
             if (pipe(pipefd) == -1) {
                 perror("pipe");
@@ -41,7 +41,7 @@ int main(int argc, char* argv[]){
             pid_t pid = fork();
             if (pid == 0) 
             { // Filho
-                char **strs = parsing(&(fifoName[0]));
+                char **strs = parsing(pedidoDoCliente.mensagem);
                 int codeSaida = choose_option(&(fifoName[0]),strs,&indices, &ID,docFolder);
                 
                 /*if (codeSaida == 3)
@@ -98,7 +98,6 @@ int main(int argc, char* argv[]){
 
 
 int choose_option(char *fifo, char** s, Livro *indices, int *ID, char *docFolder) {
-    //printf("Option:%s\n",s[0]);
     int exitCode;
     if(strlen(s[0]) == 2 && s[0][0] == '-'){
         switch (s[0][1])
@@ -116,11 +115,11 @@ int choose_option(char *fifo, char** s, Livro *indices, int *ID, char *docFolder
                 break;
             
             case 'l':
-                exitCode = numeroLinhas(fifo, indices, atoi(s[1]), s[2], docFolder);
+                exitCode = numeroLinhas(fifo, *indices, atoi(s[1]), s[2], docFolder);
                 break;
             
             case 's':
-                exitCode = listaIdDocs(s[1], *indices, fifo);
+                exitCode = listaIdDocs(s[1], *indices, fifo, docFolder);
                 break;
             
             case 'f':
